@@ -1,0 +1,79 @@
+name: 'artifactbundle-bundler'
+description: 'generate artifactbundle'
+inputs:
+  variants-version:
+    description: 'artifactbundle variants version'
+    required: true
+outputs:
+  path:
+    description: 'archived artifactbundles path'
+    value: dist
+  checksums:
+    description: 'artifactbundle checksums'
+    value: ${{ steps.hash.outputs.checksums }}
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/download-artifact@v3
+      with:
+        path: output
+    - name: Unarchive binaries
+      shell: bash
+      run: |
+        for ar in `ls output/artifact-*/*.tar.gz`; do
+          tar -xvzf $ar
+          rm -r $(dirname $ar)
+        done
+    - name: Archive artifactbundles
+      shell: bash
+      run: |
+        ARTIFACTBUNDLE=$(basename $PWD).artifactbundle
+
+        for version in `ls output`; do
+          ARTIFACTBUNDLE_PATH=dist/$version/$ARTIFACTBUNDLE
+
+          INFO_PATH=$ARTIFACTBUNDLE_PATH/info.json
+
+          mkdir -p $ARTIFACTBUNDLE_PATH
+
+          cat << EOS > $INFO_PATH
+        {
+            "schemaVersion": "1.0",
+            "artifacts": {}
+        }
+        EOS
+
+          for triple in `ls output/$version`; do
+            for json in `ls output/$version/$triple/*.json`; do
+              ID=$(basename $json .json)
+              if cat $INFO_PATH | jq --exit-status '.artifacts."'$ID'"' 1> /dev/null ; then
+                echo "$ID exists"
+              else
+                JSON=$(cat $INFO_PATH | jq '.artifacts += { "'$ID'": { "type": "executable", "version": "${{ inputs.variants-version }}", "variants": [] } }')
+                echo $JSON > $INFO_PATH
+              fi
+
+              JSON=$(cat $INFO_PATH | jq --argjson var $(cat $json | jq -c .) '.artifacts."'$ID'".variants += [$var]')
+              echo $JSON | jq . > $INFO_PATH
+            done
+
+            mkdir -p $ARTIFACTBUNDLE_PATH/$triple
+            mv output/$version/$triple/bin $ARTIFACTBUNDLE_PATH/$triple
+          done
+
+          pushd $ARTIFACTBUNDLE_PATH/../
+          zip -r $ARTIFACTBUNDLE.$version.zip $ARTIFACTBUNDLE
+          popd
+
+          rm -rf $ARTIFACTBUNDLE_PATH
+        done
+    - name: Calculate checksums
+      id: hash
+      shell: bash
+      run: |
+        checksums="$(ls dist/**/*.zip | xargs -I {} shasum -a 256 {})"
+        checksums="${checksums//'%'/'%25'}"
+        checksums="${checksums//$'\n'/'%0A'}"
+        checksums="${checksums//$'\r'/'%0D'}"
+
+        echo "checksums=$checksums" >> $GITHUB_OUTPUT
