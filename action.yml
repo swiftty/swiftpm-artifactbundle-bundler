@@ -67,7 +67,7 @@ runs:
       id: hash
       shell: bash
       run: |
-        checksums="$(ls dist/**/*.zip | xargs -I {} shasum -a 256 {})"
+        checksums="$(ls dist/*.zip | xargs -I {} shasum -a 256 {})"
         checksums="${checksums//'%'/'%25'}"
         checksums="${checksums//$'\n'/'%0A'}"
         checksums="${checksums//$'\r'/'%0D'}"
