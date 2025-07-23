@@ -28,19 +28,18 @@ runs:
       shell: bash
       run: |
         ARTIFACTBUNDLE=$(basename $PWD).artifactbundle
+        ARTIFACTBUNDLE_PATH=dist/$ARTIFACTBUNDLE
+        INFO_PATH=$ARTIFACTBUNDLE_PATH/info.json
+        mkdir -p $ARTIFACTBUNDLE_PATH
 
-        for triple in `ls output`; do
-          ARTIFACTBUNDLE_PATH=dist/$ARTIFACTBUNDLE
-          INFO_PATH=$ARTIFACTBUNDLE_PATH/info.json
-          mkdir -p $ARTIFACTBUNDLE_PATH
-
-          cat << EOS > $INFO_PATH
+        cat << EOS > $INFO_PATH
         {
             "schemaVersion": "1.0",
             "artifacts": {}
         }
         EOS
 
+        for triple in `ls output`; do
           for json in `ls output/$triple/*.json`; do
             ID=$(basename $json .json)
             if cat $INFO_PATH | jq --exit-status '.artifacts."'$ID'"' 1> /dev/null ; then
@@ -56,13 +55,13 @@ runs:
 
           mkdir -p $ARTIFACTBUNDLE_PATH/$triple
           mv output/$triple/bin $ARTIFACTBUNDLE_PATH/$triple
-
-          pushd $ARTIFACTBUNDLE_PATH/../
-          zip -r $ARTIFACTBUNDLE.zip $ARTIFACTBUNDLE
-          popd
-
-          rm -rf $ARTIFACTBUNDLE_PATH
         done
+
+        pushd $ARTIFACTBUNDLE_PATH/../
+        zip -r $ARTIFACTBUNDLE.zip $ARTIFACTBUNDLE
+        popd
+
+        rm -rf $ARTIFACTBUNDLE_PATH
     - name: Calculate checksums
       id: hash
       shell: bash
