@@ -14,7 +14,7 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - uses: actions/download-artifact@v5
+    - uses: actions/download-artifact@v6
       with:
         path: output
     - name: Unarchive binaries
